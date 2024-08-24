@@ -4,32 +4,56 @@
 @inject NavigationManager NavManager
 @implements IAsyncDisposable
 
-<div class="form-group">
-    <label>User: <input @bind="userInput"/></label>
-
+<div class="container text-center ">
+@if (!IsConnected)
+{
+<div class="col mx-auto mt-5">
+    <div class="row justify-content-center">
+        <div class="col-8"><h2 class="display-1">Welcome to chat app!</h2>
+            <h3 class="">Enter your username to enter the chat</h3>
+        </div>
+        <div class="col-8">
+            <div class="input-group">
+            <input class="form-control-lg w-75 py-2" @bind="userInput"/> 
+            <button @onclick="Connect" class="btn-lg w-25 text-white third-color">Go Chatting</button>
+            </div>
+        </div>
+        
+    </div>
 </div>
-<div class="form-group">
-    <label>Message: <input @bind="messageInput"/></label>
-</div>
-<button  @onclick="Send">Send</button>
+   
+    
+}
 
-<hr/>
+else{
 
-<ul>
-    @foreach(string message in messages)
+    <div class="col">
+        <ul>
+    @foreach (string message in messages)
     {
         <li>@message</li>
     }
 </ul>
+<div class="form-group">
+    <label>Message: <input @bind="messageInput" /></label>
+</div>
+<button @onclick="Send">Send</button>
 
-@code{
+<hr />
+
+
+        </div>
+}
+</div>
+
+@code {
     private HubConnection? hubConnection;
     private List<string> messages = new();
     private string? userInput;
     private string? messageInput;
 
 
-    protected override async Task OnInitializedAsync()
+    private async Task Connect()
     {
         hubConnection = new HubConnectionBuilder()
         .WithUrl(NavManager.ToAbsoluteUri("/chathub"))
@@ -50,7 +74,7 @@
 
     private async Task Send()
     {
-        if(hubConnection is not null)
+        if (hubConnection is not null)
         {
             await hubConnection.SendAsync("SendMessage", userInput, messageInput);
         }
