@@ -1,83 +1,119 @@
 ﻿@page "/"
 @rendermode InteractiveServer
+@using DataAccessLayer.Entities
 @using Microsoft.AspNetCore.SignalR.Client
+@using ServicesLayer.Services
 @inject NavigationManager NavManager
+@inject SentimentAnalysisService SentimentAnalysis
 @implements IAsyncDisposable
 
-<div class="container text-center ">
+
 @if (!IsConnected)
 {
-<div class="col mx-auto mt-5">
-    <div class="row justify-content-center">
-        <div class="col-8"><h2 class="display-1">Welcome to chat app!</h2>
-            <h3 class="">Enter your username to enter the chat</h3>
-        </div>
-        <div class="col-8">
-            <div class="input-group">
-            <input class="form-control-lg w-75 py-2" @bind="userInput"/> 
-            <button @onclick="Connect" class="btn-lg w-25 text-white third-color">Go Chatting</button>
+    <div class="container text-center ">
+        <div class="col mx-auto mt-5">
+            <div class="row justify-content-center">
+                <div class="col-8">
+                    <h2 class="display-1">Welcome to chat app!</h2>
+                    <h3 class="">Enter your username to enter the chat</h3>
+                </div>
+                <div class="col-8">
+                    <div class="input-group">
+                        <input class="form-control-lg w-75 py-2" @bind="userInput" />
+                        <button @onclick="Connect" class="btn-lg w-25 text-white third-color">Go Chatting</button>
+                    </div>
+                </div>
+
             </div>
         </div>
-        
+
     </div>
-</div>
-   
-    
+
 }
 
-else{
+else
+{
+    <div class="container h-100">
+        <div class="col">
+            <div class="row">
+                <div class="col-lg-10 mx-auto chat overflow-auto">
+                    <div class="chat-messages overflow-auto">
+                        <div>
+                            @foreach (var message in messages)
+                            {
+                                <div class="card  mb-3 @GetSentimentColor(message)">
+                                    <div class="card-header">@message.User</div>
+                                    <div class="card-body">
+                                        <p class="card-text">@message.Content</p>
+                                    </div>
+                                    <div class="card-footer text-end">
+                                        <small class="text-body-secondary">@message.DateSent.ToLocalTime().ToString("f")</small>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-1 col-lg-10 mx-auto ">
 
-    <div class="col">
-        <ul>
-    @foreach (string message in messages)
-    {
-        <li>@message</li>
-    }
-</ul>
-<div class="form-group">
-    <label>Message: <input @bind="messageInput" /></label>
-</div>
-<button @onclick="Send">Send</button>
+                    <div class="input-group">
+                        <textarea class="form-control message-input" @bind="messageInput" />
+                        <button class="btn third-color text-white" @onclick="Send">Send</button>
+                    </div>
 
-<hr />
-
-
+                </div>
+            </div>
         </div>
+    </div>
 }
-</div>
 
 @code {
     private HubConnection? hubConnection;
-    private List<string> messages = new();
+    private List<Message> messages = new();
     private string? userInput;
     private string? messageInput;
 
 
     private async Task Connect()
     {
-        hubConnection = new HubConnectionBuilder()
-        .WithUrl(NavManager.ToAbsoluteUri("/chathub"))
-        .WithAutomaticReconnect()
-        .Build();
-
-        hubConnection.On<string, string>("GetMessage", (user, message) =>
+        if (!string.IsNullOrWhiteSpace(userInput))
         {
-            var formattedMessage = $"{user}:{message}";
+            hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavManager.ToAbsoluteUri("/chathub"))
+            .WithAutomaticReconnect()
+            .Build();
 
-            messages.Add(formattedMessage);
-            InvokeAsync(StateHasChanged);
-        });
+            hubConnection.On<List<Message>>("GetMessages", (messagesList) =>
+            {
+                messages = messagesList;
+                InvokeAsync(StateHasChanged);
 
-        await hubConnection.StartAsync();
+            });
+
+            await hubConnection.StartAsync();
+        }
     }
 
 
     private async Task Send()
     {
-        if (hubConnection is not null)
+        if (hubConnection is not null && !string.IsNullOrWhiteSpace(messageInput))
         {
             await hubConnection.SendAsync("SendMessage", userInput, messageInput);
         }
+    }
+
+    private string GetSentimentColor(Message msg)
+    {
+        string output = msg.Sentiment switch
+        {
+            "Positive" => "bg-success text-white ",
+            "Negative" => "bg-danger text-white ",
+            "Mixed" => "bg-warning ",
+                    _=> "bg-transparent border border-dark"
+        };
+
+        return output;
     }
 
     public bool IsConnected =>
